@@ -1,0 +1,121 @@
+---
+title: "Initial Results"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Installing required packages
+
+```{r}
+
+library(dplyr)
+library(MASS) 
+library(leaps) 
+
+install.packages("rpart")
+library(rpart)
+
+install.packages("rpart.plot")
+library(rpart.plot)
+
+install.packages("forecast")
+library(forecast)
+
+
+install.packages("randomForest")
+library(randomForest)
+```
+
+
+# Uploading Dataframe
+
+In the previous section, data cleansing was executed and final data frame is ready for this project.
+
+```{r}
+TTC.Subway=read.csv("C:\\Users\\Tina_\\Desktop\\CKME 136_Capstone\\Documents\\Data\\TTCsubway_output.csv", header = TRUE, stringsAsFactors = FALSE, sep = ",")
+
+
+TTC.Subway= TTC.Subway[,-1]
+colnames(TTC.Subway)[7]= "Time"
+
+TTC.Subway$Day=as.factor(TTC.Subway$Day)
+TTC.Subway$Station=as.factor(TTC.Subway$Station)
+TTC.Subway$Bound=as.factor(TTC.Subway$Bound)
+TTC.Subway$Line=as.factor(TTC.Subway$Line)
+TTC.Subway$Time=as.factor(TTC.Subway$Time)
+TTC.Subway$Month=as.factor(TTC.Subway$Month)
+str(TTC.Subway)
+summary(TTC.Subway)
+```
+
+# Selecting Attributes
+
+Forward selection model was used for selecting attributes and getting a better understanding of attributes in the data frame. 
+
+```{r pressure, echo=FALSE}
+set.seed(1500)
+
+#Forward Selection Model:
+
+full <- lm(Min.Delay~. ,data=TTC.Subway)
+null <- lm(Min.Delay~1,data=TTC.Subway)
+stepF <- stepAIC(null, scope=list(lower=null, upper=full), direction= "forward", trace=TRUE)
+summary(stepF)
+
+```
+Based on the results of the forward selection model, the mdodel that includes Minimum Gap,Station, Day, Time, Bound and Month attributes has achived a lower AIC and all mentioned attribues are significantly correlated and could be included in the regression model.
+However, I deceided to include Day, Bound, Line and Month in my regression models. The Station attribute was excluded because of high number of levels and it was not possible to reduce it. I beleived the Bound attribute to some extend can decribe and replace the Station attribue.    
+
+# Splitting data frame into tain and test sets
+
+In the next step, I split the dataset to 70% of training and 30% of test sets, to make sure that the training set and the test set do not have any common data points.
+
+```{r}
+rn_train <- sample(nrow(TTC.Subway), floor(nrow(TTC.Subway)*0.7))
+train <- TTC.Subway[rn_train,]
+test <- TTC.Subway[-rn_train,]
+
+```
+
+#Regression Tree
+
+In order to predict minimum delay in minutes, I used Regression tree and Random Forest. And to to compare their accuracy RMSE for each model was calculated.
+
+```{r}
+
+#Regression Tree
+
+Reg_Tree=rpart(Min.Delay ~ Day+Bound+Line+Month, data=train, method = "anova", control=rpart.control(minsplit=1, minbucket=2, cp=0.001))
+Reg_Tree
+rpart.plot(Reg_Tree)
+Prediction= predict(Reg_Tree, test)
+
+#Calcultae RMSE for Regression Tree
+
+accuracy(Prediction, test$Min.Delay)
+
+```
+Among all attributed Line Attribute was the most predcitable. 
+
+# Random Forest
+
+The last used regression model is Random Forest.
+
+```{r}
+
+#Random Forest
+
+RF_Reg= randomForest(Min.Delay ~ Day+Bound+Line+Month, data=train, type="regression")
+RF_Prediction= predict(RF_Reg, test)
+plot(RF_Reg)
+
+#Calcultae RMSE for Random Forest
+
+accuracy(RF_Prediction, test$Min.Delay)
+
+```
+
+Comparing RMSE error results for Regression tree (5.18) and random forest (5.14), the results of both regression models are close and they has achieved  the same level of accuracy in prediction. However, Random Forest has a better result. 
